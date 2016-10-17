@@ -1,0 +1,24 @@
+{
+  "name": "encrypt_image_base_on_arnold",
+  "version": "1.0.0",
+  "description": "毕设",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lisiur/encryptImageBaseOnArnold.git"
+  },
+  "author": "lisiur",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lisiur/encryptImageBaseOnArnold/issues"
+  },
+  "homepage": "https://github.com/lisiur/encryptImageBaseOnArnold#readme",
+  "dependencies": {
+    "get-pixels": "^3.3.0",
+    "images": "^3.0.0",
+    "node-images": "^1.5.5"
+  }
+}

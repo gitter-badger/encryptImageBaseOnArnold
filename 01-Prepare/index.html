@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Arnold</title>
+</head>
+<body>
+<canvas id="testImg" width="200" height="200"></canvas>
+<script>
+
+    // 增强ImageData类
+    ImageData.prototype.getPixels = function (x, y) {
+        var offset = (this.height * y + x) * 4;
+        return this.data.slice(offset, offset+4);
+    };
+
+    ImageData.prototype.setPixels = function (x, y, rgba) {
+        var offset = (this.height * y + x) * 4;
+        this.data[offset] = rgba[0];
+        this.data[offset + 1] = rgba[1];
+        this.data[offset + 2] = rgba[2];
+        this.data[offset + 3] = rgba[3];
+    };
+
+    ImageData.prototype.clone = function () {
+        return new ImageData(this.data.slice(), this.width, this.height);
+    };
+
+
+    // 初始化canvas
+    var canvas = document.getElementById("testImg");
+    var ctx = canvas.getContext("2d");
+    var tmpCanvas, tmpCtx;
+
+    // 加载图片预处理
+    var url = "./resources/cat.png";
+    var image = new Image(200, 200);
+    image.src = url;
+
+    // 图片加载完成
+    image.onload = function() {
+
+        // 绘制图片
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+
+        // Arnold变换
+        var imageData = ctx.getImageData(0, 0, image.width, image.height);
+        var tmpImageData = imageData.clone();
+        var currentRGBA, targetX, targetY;
+        for(var k = 0; k < 150 ; k++) {
+            for(var y = 0; y < imageData.height; y++) {
+                for(var x = 0; x < imageData.width; x++) {
+                    targetX = (x + y) % imageData.width;
+                    targetY = (x + y * 2) % imageData.height;
+                    currentRGBA = tmpImageData.getPixels(x, y);
+                    imageData.setPixels(targetX, targetY, currentRGBA);
+                }
+            }
+            tmpImageData = imageData.clone();
+
+            // 输出中间结果
+            if((k+1) % 10 === 0) {
+                tmpCanvas = document.createElement("canvas");
+                tmpCtx = tmpCanvas.getContext("2d");
+                tmpCanvas.width = image.width;
+                tmpCanvas.height = image.height;
+                tmpCtx.putImageData(imageData, 0 ,0);
+                document.body.appendChild(tmpCanvas);
+            }
+        }
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RGB_Arnold</title>
+</head>
+<body>
+<canvas id="testImg" width="200" height="200"></canvas>
+
+<script>
+
+    // 增强Array类
+    Array.prototype.multiple = function(matrix) {
+        var matrix1_row = this.length;
+        var matrix1_col = this[0].length;
+        var matrix2_row = matrix.length;
+        var matrix2_col = matrix[0].length;
+        var rst = [];
+        var tmp_rst = [];
+        var sum;
+        var i, j, k;
+        if(matrix1_col !== matrix2_row ) {
+            console.log(matrix1_col, matrix2_row);
+            throw new Exception();
+        } else {
+            for(i = 0; i < matrix1_row; i++) {
+                tmp_rst = [];
+                for(j = 0; j < matrix2_col; j++) {
+                    sum = 0;
+                    for(k = 0; k < matrix1_col; k++) {
+                        sum += this[i][k] * matrix[k][j];
+                    }
+                    tmp_rst.push(sum);
+                }
+                rst.push(tmp_rst);
+            }
+            return rst;
+        }
+    };
+
+    Array.prototype.T = function() {
+        var rst = [];
+        var tmp_rst = [];
+        var row = this.length;
+        var col = this[0].length;
+        var i, j;
+        for(j = 0; j < col; j++) {
+            tmp_rst = [];
+            for(i = 0; i < row; i++) {
+                tmp_rst.push(this[i][j]);
+            }
+            rst.push(tmp_rst);
+        }
+        return rst;
+    };
+
+    // 增强ImageData类
+    ImageData.prototype.getPixels = function (x, y) {
+        var offset = (this.height * y + x) * 4;
+        return this.data.slice(offset, offset+4);
+    };
+
+    ImageData.prototype.setPixels = function (x, y, rgba) {
+        var offset = (this.height * y + x) * 4;
+        this.data[offset] = rgba[0];
+        this.data[offset + 1] = rgba[1];
+        this.data[offset + 2] = rgba[2];
+        this.data[offset + 3] = rgba[3];
+    };
+
+    ImageData.prototype.clone = function () {
+        return new ImageData(this.data.slice(), this.width, this.height);
+    };
+
+
+    // 初始化canvas
+    var canvas = document.getElementById("testImg");
+    var ctx = canvas.getContext("2d");
+    var tmpCanvas, tmpCtx;
+
+    // 加载图片预处理
+    var url = "./resources/color_cat.png";
+    var image = new Image(128, 128);
+    image.src = url;
+
+    // 图片加载完成
+    image.onload = function() {
+
+        // 绘制图片
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+
+        // Arnold_Color变换
+        var imageData = ctx.getImageData(0, 0, image.width, image.height);
+        var tmpImageData = imageData.clone();
+        var currentRGB, targetRGB;
+        var RGB_Arnold_Matrix = [[1,1,1],[1,2,2],[1,2,3]];
+        for(var k = 0; k < 448 ; k++) { // 迭代次数
+            for(var y = 0; y < image.height; y++) {
+                for(var x = 0; x < image.width; x++) {
+                    currentRGB = [tmpImageData.getPixels(x, y).slice(0, 3)].T();
+                    targetRGB = RGB_Arnold_Matrix.multiple(currentRGB).T()[0];
+
+                    targetRGB = targetRGB.map(function(item) {
+                        return item % 256;
+                    });
+                    imageData.setPixels(x, y, targetRGB.push(255) && targetRGB);
+                }
+            }
+            tmpImageData = imageData.clone();
+
+            // 输出中间结果
+            if(true) {
+                tmpCanvas = document.createElement("canvas");
+                tmpCtx = tmpCanvas.getContext("2d");
+                tmpCanvas.width = image.width;
+                tmpCanvas.height = image.height;
+                tmpCtx.putImageData(imageData, 0 ,0);
+                document.body.appendChild(tmpCanvas);
+            }
+        }
+    };
+</script>
+</body>
+</html>

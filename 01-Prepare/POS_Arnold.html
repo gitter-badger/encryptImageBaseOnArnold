@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Arnold</title>
+    <title>POS_Arnold</title>
 </head>
 <body>
 <canvas id="testImg" width="200" height="200"></canvas>
+
 <script>
 
     // 增强ImageData类
@@ -33,8 +34,8 @@
     var tmpCanvas, tmpCtx;
 
     // 加载图片预处理
-    var url = "./resources/cat.png";
-    var image = new Image(200, 200);
+    var url = "./resources/color_cat.png";
+    var image = new Image(128, 128);
     image.src = url;
 
     // 图片加载完成
@@ -48,10 +49,11 @@
         // Arnold变换
         var imageData = ctx.getImageData(0, 0, image.width, image.height);
         var tmpImageData = imageData.clone();
-        var currentRGBA, targetX, targetY;
-        for(var k = 0; k < 150 ; k++) {
-            for(var y = 0; y < imageData.height; y++) {
-                for(var x = 0; x < imageData.width; x++) {
+        var currentRGBA, targetX, targetY, targetPosition;
+        var k, y, x;
+        for(k = 0; k < 96 ; k++) {
+            for(y = 0; y < imageData.height; y++) {
+                for(x = 0; x < imageData.width; x++) {
                     targetX = (x + y) % imageData.width;
                     targetY = (x + y * 2) % imageData.height;
                     currentRGBA = tmpImageData.getPixels(x, y);

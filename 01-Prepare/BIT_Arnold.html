@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BIT_Arnold</title>
+</head>
+<body>
+<canvas id="testImg" width="200" height="200"></canvas>
+<br />
+<script>
+    var zft = [];
+    for(var p=0; p<256; p++) {
+        zft[p] = 0;
+    }
+    // 增强Array类
+    Array.prototype.multiple = function(matrix) {
+        var matrix1_row = this.length;
+        var matrix1_col = this[0].length;
+        var matrix2_row = matrix.length;
+        var matrix2_col = matrix[0].length;
+        var rst = [];
+        var tmp_rst = [];
+        var sum;
+        var i, j, k;
+        if(matrix1_col !== matrix2_row ) {
+//            console.log(matrix1_col, matrix2_row);
+            throw new Exception();
+        } else {
+            for(i = 0; i < matrix1_row; i++) {
+                tmp_rst = [];
+                for(j = 0; j < matrix2_col; j++) {
+                    sum = 0;
+                    for(k = 0; k < matrix1_col; k++) {
+                        sum += this[i][k] * matrix[k][j];
+                    }
+                    tmp_rst.push(sum);
+                }
+                rst.push(tmp_rst);
+            }
+            return rst;
+        }
+    };
+
+    Array.prototype.T = function() {
+        var rst = [];
+        var tmp_rst = [];
+        var row = this.length;
+        var col = this[0].length;
+        var i, j;
+        for(j = 0; j < col; j++) {
+            tmp_rst = [];
+            for(i = 0; i < row; i++) {
+                tmp_rst.push(this[i][j]);
+            }
+            rst.push(tmp_rst);
+        }
+        return rst;
+    };
+
+
+    // 增强ImageData类
+    /**
+     *
+     * @param x => 第x行
+     * @param y => 第y列
+     * @returns {Array} => [R,G,B,A]
+     */
+    ImageData.prototype.getPixels = function (x, y) {
+        var offset = (this.height * y + x) * 4;
+        return this.data.slice(offset, offset+4);
+    };
+
+    //Gray = R*0.299 + G*0.587 + B*0.114
+    /**
+     *
+     * @param x => 第x行
+     * @param y => 第y列
+     * @returns {number} => [0,255]
+     */
+    ImageData.prototype.getGrayValue = function (x, y) {
+        var rgba = this.getPixels(x, y);
+//        return parseInt(rgba[0] * 0.3 + rgba[1] * 0.6 + rgba[2] * 0.1);
+        return rgba[1];
+    };
+
+    ImageData.prototype.getGrayValueByBit = function (x, y, index) {
+        // 将二进制逆置11110000 => 00001111
+        // 然后补〇防止溢出 => 00001111 00000000
+        var grayValue = this.getGrayValue(x, y).toString(2).split("").reverse().join("")+"00000000";
+        if(index) {
+            var bitValue = grayValue[index];
+            return parseInt(bitValue);
+        } else {
+            return grayValue;
+        }
+
+    };
+
+    ImageData.prototype.setPixels = function (x, y, rgba) {
+        var offset = (this.height * y + x) * 4;
+        this.data[offset] = rgba[0];
+        this.data[offset + 1] = rgba[1];
+        this.data[offset + 2] = rgba[2];
+        this.data[offset + 3] = rgba[3];
+    };
+
+    ImageData.prototype.setGrayPixels = function (x, y, grayValue) {
+        var offset = (this.height * y + x) * 4;
+        this.data[offset] = grayValue;
+        this.data[offset + 1] = grayValue;
+        this.data[offset + 2] = grayValue;
+        this.data[offset + 3] = 255;
+    };
+
+    ImageData.prototype.clone = function () {
+        return new ImageData(this.data.slice(), this.width, this.height);
+    };
+
+    // x(n) = alpha * x(n-1) * (1 - x(n-1))
+
+    // alpha = 3.99999
+    // x(0) = 0.12345678912342
+    // y(0) = 0.87865765433212
+
+    // n(i) = 1
+    // p(i) = abs(x(100+i) * 10**14) mod N
+    // q(i) = abs(y(100+i) * 10**14) mod M
+    var paramsCache = {
+        maxIndex: 0,
+        params: [[0.1234567812342, 0.87865765433212]]
+    };
+    /**
+     *
+     * @param i 生成第i对参数
+     * @param N 图片长度
+     * @param M 图片高度
+     * @returns {*}
+     */
+    function generatorParams(i, N, M) {
+        i = i + 100;
+        var x, y, index;
+        var alpha = 3.99999;
+
+        if(i > paramsCache.maxIndex) {
+            x = paramsCache.params[paramsCache.maxIndex][0];
+            y = paramsCache.params[paramsCache.maxIndex][1];
+            for (index = paramsCache.maxIndex + 1; index <= i; index++) {
+                x = alpha * x * (1 - x);
+                y = alpha * y * (1 - y);
+                paramsCache.params.push([x, y]);
+            }
+            paramsCache.maxIndex = i;
+            return [parseInt(x * 1E14) % N, parseInt(y * 1E14) % M];
+        } else {
+            x = paramsCache.params[i][0];
+            y = paramsCache.params[i][1];
+            return [parseInt(x * 1E14) % N, parseInt(y * 1E14) % M];
+        }
+    }
+
+    // 初始化canvas
+    var canvas = document.getElementById("testImg");
+    var ctx = canvas.getContext("2d");
+    var tmpCanvas, tmpCtx;
+
+    // 加载图片预处理
+    var url = "./resources/Linda.png";
+    var image = new Image(200, 200);
+    image.src = url;
+
+    // 图片加载完成
+    image.onload = function() {
+
+        // 绘制图片
+        canvas.width = image.width;
+        canvas.height = image.height;
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+
+        // Arnold_bit变换
+        var imageData = ctx.getImageData(0, 0, image.width, image.height);
+
+        // BEGIN 创建5个bit通道
+        var tmpImageData = [], i;
+        for(i = 0; i < 5; i++) {
+            tmpImageData.push(imageData.clone());
+        }
+        // END 创建5个bit通道
+
+        // BEGIN 创建5个Arnold矩阵
+        var arnold_Matrix = [], j;
+        var params = generatorParams(1, imageData.width, imageData.height);
+        arnold_Matrix.push([[ 1        , params[0]              ],
+                            [ params[1], (params[0]*params[1]+1) % imageData.height ]]);
+        for(j = 5; j <= 8; j++) {
+            params = generatorParams(j, imageData.width, imageData.height);
+            arnold_Matrix.push([[ 1        , params[0]              ],
+                                [ params[1], (params[0]*params[1]+1) % imageData.height ]]);
+        }
+        // END 创建5个Arnold矩阵
+
+        // BEGIN 生成5个bit图
+        var currentRGBA, currentGrayValue, currentGraybitsValues;
+        var currentGrayBitValue = [];
+        var x, y, k;
+
+        for (y = 0; y < imageData.height; y++) {
+            for(x = 0; x < imageData.width; x++) {
+                currentGraybitsValues = imageData.getGrayValueByBit(x, y).slice(0,4); // 01110110 => 0111
+//                if(x===0&&y===0)console.log(currentGraybitsValues);
+                currentGrayValue = parseInt(currentGraybitsValues.split("").reverse().join(""), 2); // 获取低四位的灰度值
+//                if(x===0&&y===0) console.log(currentGrayValue);
+                tmpImageData[0].setGrayPixels(x, y, currentGrayValue);
+            }
+        }
+        for(k = 4; k < 8 ; k++) {
+            for (y = 0; y < imageData.height; y++) {
+                for (x = 0; x < imageData.width; x++) {
+                    currentGrayBitValue = imageData.getGrayValueByBit(x, y, k);
+//                    if (currentGrayBitValue === 0) currentGrayValue = 0;
+//                    else currentGrayValue = 255;
+                    if(currentGrayBitValue === 1) currentGrayValue = Math.pow(2, k);
+                    else currentGrayValue = 0;
+                    tmpImageData[k - 3].setGrayPixels(x, y, currentGrayValue);
+                }
+            }
+        }
+        // END 生成5个bit图
+
+
+        // 输出中间结果
+        for(i = 0; i < 5; i++) {
+            tmpCanvas = document.createElement("canvas");
+            tmpCtx = tmpCanvas.getContext("2d");
+            tmpCanvas.width = image.width;
+            tmpCanvas.height = image.height;
+            tmpCtx.putImageData(tmpImageData[i], 0 ,0);
+            document.body.appendChild(tmpCanvas);
+        }
+
+        // Arnold 变换
+        var targetX, targetY, targetXY, tmpData;
+        for(k = 0; k < 5 ; k++) {
+            tmpData = tmpImageData[k].clone();
+            for(y = 0; y < tmpData.height; y++) {
+                for(x = 0; x < tmpData.width; x++) {
+//                    if (x===0&&y===0)console.log(arnold_Matrix[k]);
+                    targetXY = arnold_Matrix[k].multiple([[x],[y]]).T(); //[[x, y]]
+//                    console.log(targetXY);
+                    targetX = targetXY[0][0] % tmpData.width;
+                    targetY = targetXY[0][1] % tmpData.height;
+                    currentRGBA = tmpData.getPixels(x, y);
+                    tmpImageData[k].setPixels(targetX, targetY, currentRGBA);
+                }
+            }
+        }
+
+        // 输出中间结果
+        document.body.appendChild(document.createElement("br"));
+        for(i = 0; i < 5; i++) {
+            tmpCanvas = document.createElement("canvas");
+            tmpCtx = tmpCanvas.getContext("2d");
+            tmpCanvas.width = image.width;
+            tmpCanvas.height = image.height;
+            tmpCtx.putImageData(tmpImageData[i], 0 ,0);
+            document.body.appendChild(tmpCanvas);
+        }
+
+        // 合成最终结果
+        var finalImageData = imageData.clone();
+        var finalGrayValue;
+        for(y = 0; y < imageData.height; y++) {
+            for(x = 0; x < imageData.width; x++) {
+                finalGrayValue = tmpImageData[0].getGrayValue(x, y); // 低四位
+//                if(x===0&&y===0)console.log(currentGrayValue);
+                for (i = 4; i < 8; i++) { // 高四位
+//                    if(tmpImageData[i].getGrayValue(x, y) !== 0) {
+//                        finalGrayValue += Math.pow(2, i);
+//                    }
+                    finalGrayValue += tmpImageData[i-3].getGrayValue(x, y);
+                }
+                finalImageData.setGrayPixels(x, y, finalGrayValue);
+            }
+        }
+
+        // 输出最终结果
+        document.body.appendChild(document.createElement("br"));
+
+        tmpCanvas = document.createElement("canvas");
+        tmpCtx = tmpCanvas.getContext("2d");
+        tmpCanvas.width = image.width;
+        tmpCanvas.height = image.height;
+        tmpCtx.putImageData(finalImageData, 0 ,0);
+        document.body.appendChild(tmpCanvas);
+
+
+        for(y = 0; y < imageData.height; y++) {
+            for (x = 0; x < imageData.width; x++) {
+                currentGrayValue = finalImageData.getGrayValue(x, y);
+                if(zft[currentGrayValue]) zft[currentGrayValue]++;
+                else zft[currentGrayValue] = 1;
+
+            }
+        }
+        for(i = 0; i < 256; i++) {
+            console.log(zft[i]);
+        }
+
+    };
+</script>
+</body>
+</html>
